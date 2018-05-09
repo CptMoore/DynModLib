@@ -5,9 +5,10 @@ using System.Reflection;
 using HBS.Util;
 using System.Linq;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Text;
 using BattleTech;
 using HBS.Logging;
+using Mono.CSharp;
 
 namespace DynTechMod
 {
@@ -34,6 +35,8 @@ namespace DynTechMod
 
             references.AddRange(GetManagedAssemblyPaths());
             references.Add(Assembly.GetExecutingAssembly().Location);
+
+            Assembly.LoadFrom(Path.Combine(ModDirectory, "Mono.CSharp.dll"));
 
             Directory.GetDirectories(ModsDirectory)
                 .Select(m => Path.Combine(m, "source\\Control.cs"))
@@ -109,39 +112,36 @@ namespace DynTechMod
                     }
                 }
 
-                var monoPath = Path.Combine(ModDirectory, "Mono");
+                var arguments = new List<string>();
+                arguments.Add("/target:library");
+                arguments.Add("/nostdlib+");
+                arguments.Add("/noconfig");
+                arguments.Add("/debug-");
+                arguments.Add("/optimize+");
+                arguments.Add("/out:" + outPath);
+                refPaths.ForEach(r => arguments.Add("/r:" + r));
+                srcPaths.ForEach(s => arguments.Add(s));
 
-                // Use ProcessStartInfo class
-                var startInfo = new ProcessStartInfo();
-                startInfo.CreateNoWindow = true;
-                startInfo.UseShellExecute = false;
-                startInfo.RedirectStandardOutput = true;
-                startInfo.RedirectStandardInput = true;
-                startInfo.FileName = Path.Combine(monoPath, "bin\\mono.exe");
-                startInfo.WindowStyle = ProcessWindowStyle.Hidden;
-                startInfo.Arguments = "\"" + Path.Combine(monoPath, "lib\\mono\\4.5\\csc.exe") + "\"";
-                startInfo.Arguments += " /target:library /nostdlib+ /noconfig /parallel+ /debug- /optimize+";
-                startInfo.Arguments += " /out:\"" + outPath + "\"";
-                refPaths.ForEach(r => startInfo.Arguments += " /r:\"" + r + "\"");
-                srcPaths.ForEach(s => startInfo.Arguments += " \"" + s + "\"");
-
-                //logger.Log(startInfo.Arguments);
-
-                using (var process = Process.Start(startInfo))
+                var memory = new MemoryStream();
+                var writer = new StreamWriter(memory, Encoding.UTF8);
+                var compilerAssembly = Assembly.GetAssembly(typeof(Evaluator));
+                var type = compilerAssembly.GetType("Mono.CSharp.CompilerCallableEntryPoint");
+                var method = type.GetMethod("InvokeCompiler");
+                // CompilerCallableEntryPoint.InvokeCompiler(arguments.ToArray(), writer)
+                var result = (bool)method.Invoke(method, new object[] { arguments.ToArray(), writer });
+                writer.Flush();
+                if (result)
                 {
-                    var output = process.StandardOutput.ReadToEnd();
-                    process.WaitForExit();
-                    if (process.ExitCode == 0)
-                    {
-                        logger.Log("compiled assembly " + outPath);
-                        return Assembly.LoadFrom(outPath);
-                    }
-                    else
-                    {
-                        logger.LogError("csc could not compile assembly " + outPath);
-                        logger.LogError("csc output: " + output);
-                        return null;
-                    }
+                    logger.Log("compiled assembly " + outPath);
+                    return Assembly.LoadFrom(outPath);
+                }
+                else
+                {
+                    memory.Position = 0;
+                    var reader = new StreamReader(memory);
+                    logger.LogError("csc could not compile assembly " + outPath);
+                    logger.LogError("csc output: " + reader.ReadToEnd());
+                    return null;
                 }
             }
             catch (Exception e)
