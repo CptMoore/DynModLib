@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Text;
 using BattleTech;
 using HBS.Logging;
-using Mono.CSharp;
 
 namespace DynTechMod
 {
@@ -23,6 +22,8 @@ namespace DynTechMod
 
         private static List<string> references = new List<string>();
 
+        private static Assembly compilerAssembly;
+
         public static void Init()
         {
             var self = new Mod(ModDirectory);
@@ -36,7 +37,7 @@ namespace DynTechMod
             references.AddRange(GetManagedAssemblyPaths());
             references.Add(Assembly.GetExecutingAssembly().Location);
 
-            Assembly.LoadFrom(Path.Combine(ModDirectory, "Mono.CSharp.dll"));
+            compilerAssembly = Assembly.LoadFrom(Path.Combine(ModDirectory, "Mono.CSharp.dll"));
 
             Directory.GetDirectories(ModsDirectory)
                 .Select(m => Path.Combine(m, "source\\Control.cs"))
@@ -124,7 +125,6 @@ namespace DynTechMod
 
                 var memory = new MemoryStream();
                 var writer = new StreamWriter(memory, Encoding.UTF8);
-                var compilerAssembly = Assembly.GetAssembly(typeof(Evaluator));
                 var type = compilerAssembly.GetType("Mono.CSharp.CompilerCallableEntryPoint");
                 var method = type.GetMethod("InvokeCompiler");
                 // CompilerCallableEntryPoint.InvokeCompiler(arguments.ToArray(), writer)
