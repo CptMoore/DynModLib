@@ -235,6 +235,6 @@ namespace DynTechMod
     public class ModSettings
     {
         // after loading settings the log level will revert to Warning from the initial Debug
-        public string logLevel = "Warning";
+        public string logLevel = "Log";
     }
 }
