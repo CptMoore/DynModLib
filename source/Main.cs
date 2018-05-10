@@ -9,13 +9,13 @@ using System.Text;
 using BattleTech;
 using HBS.Logging;
 
-namespace DynTechMod
+namespace DynModLib
 {
     public static class Main
     {
         private static ILog logger;
 
-        private const string ModName = "DynTechMod";
+        private const string ModName = "DynModLib";
 
         private static string ModsDirectory => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
         private static string ModDirectory => Path.Combine(ModsDirectory, ModName);
@@ -74,6 +74,7 @@ namespace DynTechMod
                 return;
             }
 
+            // TODO: remove loading once integrated into ModTek
             var controlClass = mod.Name + ".Control";
             var type = assembly.GetType(controlClass);
             if (type == null)
@@ -81,13 +82,12 @@ namespace DynTechMod
                 logger.LogError("Can't find class \"" + controlClass + "\"");
                 return;
             }
-            var method = type.GetMethod("OnInit", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Standard, new[]{typeof(Mod)}, null);
+            var method = type.GetMethod("OnInit", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Standard, new[]{typeof(string)}, null);
             if (method == null)
             {
-                logger.LogError("Can't find static method \"OnInit(Mod mod)\" on class \"" + controlClass + "\"");
+                logger.LogError("Can't find static method \"OnInit(string modDirectory)\" on class \"" + controlClass + "\"");
                 return;
             }
-            //logger.LogDebug(method.ToString());
             try
             {
                 method.Invoke(method, new object[] {mod});
@@ -175,30 +175,20 @@ namespace DynTechMod
 
     public class Mod
     {
-        internal Mod(string directory)
+        public Mod(string directory)
         {
             Directory = directory;
             Name = Path.GetFileName(directory);
-
-            const string logFile = "log.txt";
-            if (!string.IsNullOrEmpty(logFile))
-            {
-                var logFilePath = Path.Combine(Directory, logFile);
-                var appender = new FileLogAppender(logFilePath, FileLogAppender.WriteMode.INSTANT);
-
-                HBS.Logging.Logger.AddAppender(Name, appender);
-                HBS.Logging.Logger.SetLoggerLevel(Name, LogLevel.Debug);
-            }
         }
 
         public string Name { get; }
         public string Directory { get; }
 
-        public string AssemblyPath => Path.Combine(Directory, "..\\" + Name + ".dll");
+        public string AssemblyPath => Path.Combine(Directory, Name + ".dll");
         private string SettingsPath => Path.Combine(Directory, "Settings.json");
-        //public string ManifestPath => Path.Combine(ModDirectory, "VersionManifest.csv");
 
         public ILog Logger => HBS.Logging.Logger.GetLogger(Name);
+        private FileLogAppender logAppender;
 
         public void LoadSettings<T>(T settings) where T : ModSettings
         {
@@ -216,9 +206,33 @@ namespace DynTechMod
 
             var logLevelString = settings.logLevel;
             DebugBridge.StringToLogLevel(logLevelString, out var level);
-            if (level != null)
+            if (level == null)
             {
-                HBS.Logging.Logger.SetLoggerLevel(Name, level);
+                level = LogLevel.Debug;
+            }
+            HBS.Logging.Logger.SetLoggerLevel(Name, level);
+
+            var logFile = settings.logFile;
+            if (!string.IsNullOrEmpty(logFile))
+            {
+                var logFilePath = Path.Combine(Directory, logFile);
+                try
+                {
+                    if (logAppender != null)
+                    {
+                        HBS.Logging.Logger.ClearAppender(Name);
+                        logAppender.Flush();
+                        logAppender.Close();
+                        logAppender = null;
+                    }
+                    logAppender = new FileLogAppender(logFilePath, FileLogAppender.WriteMode.INSTANT);
+
+                    HBS.Logging.Logger.AddAppender(Name, logAppender);
+                }
+                catch (Exception e)
+                {
+                    Logger.Log("can't create log file", e);
+                }
             }
         }
 
@@ -234,7 +248,8 @@ namespace DynTechMod
 
     public class ModSettings
     {
-        // after loading settings the log level will revert to Warning from the initial Debug
+        // after loading settings the log level will revert to Log from the initial Debug
         public string logLevel = "Log";
+        public string logFile = "log.txt";
     }
 }

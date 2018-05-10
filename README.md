@@ -1,26 +1,26 @@
-# DynTechMod
-BattleTech mod (using BTML) that enabled mods to write C# code without having to install visual studio
-
-** Prototype to test C# scripting for ModTek **
-
-## Requirements
-** Warning: Uses the experimental BTML mod loader that might change, come here again to check for updates **
-
-* install [BattleTechModLoader v0.1-alpha](https://github.com/Mpstark/BattleTechModLoader/releases) using the [instructions here](https://github.com/Mpstark/BattleTechModLoader)
-* requires Windows currently
+# DynModLib
+BattleTech mod (using BTML) that provides mods with C# scripting abilities.
 
 ## Features
 
-- compiles code dynamically and initializes it then, an example can be seen with [VisualHardpointLimits](https://github.com/CptMoore/VisualHardpointLimits)
-- allows mod users to change code without knowing visual studio 
+- can compile whole mods when loading BattleTech, an example can be seen with [StatsFixMod](https://github.com/CptMoore/StatsFixMod)
+- allows mod users to change code without installing Visual Studio or equivalent software
+- allows modders to quickly change code without having to start Visual Studio
 
 ## Future Features
 
-- provide other mods the ability to compile C# scripts that are loaded dynamically for power configuration abilities
+- provide modders the ability to integrate C# scripts that are loaded dynamically
 
-## Download
+## Requirements and Installation
+** Warning: Uses the experimental BTML and ModTek **
 
-Downloads can be found on [github](https://github.com/CptMoore/DynTechMod/releases).
+either
+* install BattleTechModTools using [BattleTechModInstaller](https://github.com/CptMoore/BattleTechModLoader/releases)
+or
+* install [BattleTechModLoader](https://github.com/Mpstark/BattleTechModLoader/releases) using [instructions here](https://github.com/Mpstark/BattleTechModLoader)
+* install [ModTek](https://github.com/Mpstark/ModTek/releases) using [instructions here](https://github.com/Mpstark/ModTek)
+* install DynModLib by putting it into the \BATTLETECH\Mods\ folder
 
-## Install
-After installing BTML, put into \BATTLETECH\Mods\ folder and launch the game.
+## Downloads
+
+Downloads can be found on [github](https://github.com/CptMoore/DynModLib/releases).
