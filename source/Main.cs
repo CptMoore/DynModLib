@@ -13,34 +13,31 @@ namespace DynModLib
 {
     public static class Main
     {
-        public static ILog logger = Logger.GetLogger(ModName);
+        internal static Mod lib;
 
-        private const string ModName = "DynModLib";
-
-        private static string ModsDirectory => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        private static string LogFile => Path.Combine(ModsDirectory, ModName + ".log");
-
-        public static void Init()
+        public static void Start(string modDirectory, string json)
         {
+            lib = new Mod(modDirectory);
+            lib.SetupLogging();
             try
             {
-                Logger.AddAppender(ModName, new FileLogAppender(LogFile, FileLogAppender.WriteMode.INSTANT));
-
-                var compilerAssembly = Assembly.LoadFrom(Path.Combine(ModsDirectory, "Mono.CSharp.dll"));
+                var compilerAssembly = Assembly.LoadFrom(Path.Combine(lib.Directory, "Mono.CSharp.dll"));
                 var references = CollectReferences();
                 var compiler = new ModCompiler(compilerAssembly, references);
 
-                Directory.GetDirectories(ModsDirectory)
+                Directory.GetDirectories(lib.ModsPath)
                     .Where(d => File.Exists(Path.Combine(d, Path.Combine("source", "Control.cs"))))
                     .Select(d => new Mod(d))
-                    .Do(m => logger.Log($"detected {m}"))
+                    .Do(m => lib.Logger.Log($"detected {m}"))
                     .Do(compiler.CompileAndLoad);
-
-                Logger.ClearAppender(ModName);
             }
             catch (Exception e)
             {
-                logger.LogError("could not initialize", e);
+                lib.Logger.LogError("could not initialize", e);
+            }
+            finally
+            {
+                lib?.ShutdownLogging();
             }
         }
 
@@ -88,11 +85,11 @@ namespace DynModLib
             try
             {
                 Compile();
-                Main.logger.Log($"{mod.Name}: prepared assembly");
+                Main.lib.Logger.Log($"{mod.Name}: prepared assembly");
             }
             catch (Exception e)
             {
-                Main.logger.Log($"{mod.Name}: error preparing assembly");
+                Main.lib.Logger.Log($"{mod.Name}: error preparing assembly");
                 mod.Logger.Log(e.Message, e.InnerException ?? e);
                 mod.ShutdownLogging();
             }
@@ -184,6 +181,7 @@ namespace DynModLib
         public string AssemblyPath => Path.Combine(Directory, Name + ".dll");
         public string SourcePath => Path.Combine(Directory, "source");
         public string SettingsPath => Path.Combine(Directory, "Settings.json");
+        public string ModsPath => Path.GetDirectoryName(Directory);
 
         public ILog Logger => HBS.Logging.Logger.GetLogger(Name);
         private FileLogAppender logAppender;
@@ -240,9 +238,18 @@ namespace DynModLib
             {
                 return;
             }
-            HBS.Logging.Logger.ClearAppender(Name);
-            logAppender.Flush();
-            logAppender.Close();
+
+            try
+            {
+
+                HBS.Logging.Logger.ClearAppender(Name);
+                logAppender.Flush();
+                logAppender.Close();
+            }
+            catch
+            {
+            }
+
             logAppender = null;
         }
 
