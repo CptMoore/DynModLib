@@ -1,5 +1,8 @@
 {
 	"Name": "DynModLib",
+	"Author": "CptMoore",
+	"Website": "https://github.com/CptMoore/DynModLib",
+
 	"DLL": "DynModLib.dll",
 	"DLLEntryPoint": "DynModLib.Main.Start"
 }
