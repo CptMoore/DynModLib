@@ -7,6 +7,13 @@ BattleTech mod (using BTML) that provides C# scripting abilities for ModTek mods
 - allows mod users to change code without installing Visual Studio or equivalent software
 - allows modders to quickly change code without having to start Visual Studio
 
+### Limitations and Known Bugs
+
+- Has to have a file called mods\mymod\source\Control.cs in order to start compilation of the whole source\ folder
+- C# 5.0 language features only, so nothing you see [here](https://github.com/dotnet/roslyn/wiki/New-Language-Features-in-C%23-6) can be used
+- Mono.CSharp version used for compiling is buggy, it can compile code that crashes e.g. using SelectMany and string[][]. It's usually good enough though.
+  It can't be helped, modern compiler versions don't have those bugs but require 20MB of compiler libraries/exes instead of only 1MB.
+
 ## Future Features
 
 - provide modders the ability to selectively compile and use C# scripts
@@ -51,6 +58,7 @@ Checklist of things to do:
 * Go into project properties and change the default namespace and assembly name to your mods name.
 * Fix the files VS can't find by removing them from the project.
 * Add your new files to VS using "Add Exiting Item".
+* Make sure to leave C# language support to 5.0 and always add all .cs file, that way your mod can stay dynamically compiled (all my bt mods work both ways)
 
 ## How to publish a mod
 
