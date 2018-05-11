@@ -1,0 +1,5 @@
+{
+	"Name": "DynModLib",
+	"DLL": "DynModLib.dll",
+	"DLLEntryPoint": "DynModLib.Main.Start"
+}

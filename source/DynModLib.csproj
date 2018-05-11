@@ -73,7 +73,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(TargetDir)$(TargetName).dll" "$(ProjectDir)..\..\..\$(TargetName).dll"
-copy /Y "$(ProjectDir)..\Mono.CSharp.dll" "$(ProjectDir)..\..\..\Mono.CSharp.dll"</PostBuildEvent>
+    <PostBuildEvent>xcopy  /Y "$(TargetDir)$(TargetName).dll" "$(ProjectDir)..\..\..\$(TargetName)\"
+xcopy  /Y "$(ProjectDir)..\Mono.CSharp.dll" "$(ProjectDir)..\..\..\$(TargetName)\"
+xcopy  /Y "$(ProjectDir)..\mod.json" "$(ProjectDir)..\..\..\$(TargetName)\"</PostBuildEvent>
   </PropertyGroup>
 </Project>
