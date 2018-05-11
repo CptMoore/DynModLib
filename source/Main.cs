@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.IO;
 using Harmony;
 using System.Reflection;
@@ -13,44 +13,43 @@ namespace DynModLib
 {
     public static class Main
     {
-        private static ILog logger;
+        public static ILog logger = Logger.GetLogger(ModName);
 
         private const string ModName = "DynModLib";
 
         private static string ModsDirectory => Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        private static string ModDirectory => Path.Combine(ModsDirectory, ModName);
-
-        private static List<string> references = new List<string>();
-
-        private static Assembly compilerAssembly;
+        private static string LogFile => Path.Combine(ModsDirectory, ModName + ".log");
 
         public static void Init()
         {
-            var self = new Mod(ModDirectory);
-            var settings = new ModSettings();
-            self.LoadSettings(settings);
-            logger = self.Logger;
+            try
+            {
+                Logger.AddAppender(ModName, new FileLogAppender(LogFile, FileLogAppender.WriteMode.INSTANT));
 
-            var harmony = HarmonyInstance.Create(ModName);
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
+                var compilerAssembly = Assembly.LoadFrom(Path.Combine(ModsDirectory, "Mono.CSharp.dll"));
+                var references = CollectReferences();
+                var compiler = new ModCompiler(compilerAssembly, references);
 
-            references.AddRange(GetManagedAssemblyPaths());
-            references.Add(Assembly.GetExecutingAssembly().Location);
+                Directory.GetDirectories(ModsDirectory)
+                    .Where(d => File.Exists(Path.Combine(d, Path.Combine("source", "Control.cs"))))
+                    .Do(compiler.CompileAndLoad);
 
-            compilerAssembly = Assembly.LoadFrom(Path.Combine(ModDirectory, "Mono.CSharp.dll"));
-
-            Directory.GetDirectories(ModsDirectory)
-                .Select(m => Path.Combine(m, "source\\Control.cs"))
-                .Where(File.Exists)
-                .Do(logger.LogDebug)
-                .Do(LoadDynamicMod);
+                Logger.ClearAppender(ModName);
+            }
+            catch (Exception e)
+            {
+                logger.LogError("could not initialize", e);
+            }
         }
 
-        public static void Reset()
+        private static List<string> CollectReferences()
         {
+            var references = GetManagedAssemblyPaths();
+            references.Add(Assembly.GetExecutingAssembly().Location);
+            return references;
         }
 
-        private static string[] GetManagedAssemblyPaths()
+        private static List<string> GetManagedAssemblyPaths()
         {
             var assemblyLocation = Assembly.GetExecutingAssembly().GetReferencedAssemblies()
                 .Where(assemblyName => assemblyName.Name == "mscorlib")
@@ -58,20 +57,66 @@ namespace DynModLib
                 .Select(Path.GetDirectoryName)
                 .Single();
 
-            return Directory.GetFiles(assemblyLocation, "*.dll");
+            return Directory.GetFiles(assemblyLocation, "*.dll").ToList();
         }
 
-        private static void LoadDynamicMod(string controlFilePath)
+        public static void Reset()
         {
-            var sourcesPath = Path.GetDirectoryName(controlFilePath);
-            var mod = new Mod(Path.GetDirectoryName(sourcesPath));
+        }
+    }
 
-            var sourceFiles = Directory.GetFiles(sourcesPath, "*.cs", SearchOption.AllDirectories);
-            var assembly = CompileAssembly(mod.AssemblyPath, references, sourceFiles.ToList());
-            if (assembly == null)
+    internal class ModCompiler
+    {
+        private readonly Assembly compilerAssembly;
+        private readonly List<string> references;
+
+        internal ModCompiler(Assembly compilerAssembly, List<string> references)
+        {
+            this.compilerAssembly = compilerAssembly;
+            this.references = references;
+        }
+
+        private Mod mod;
+
+        internal void CompileAndLoad(string modDirectory)
+        {
+            mod = new Mod(modDirectory);
+            mod.SetupLogging();
+
+            try
             {
-                logger.LogError("Error compiling mod " + mod.Name);
-                return;
+                Main.logger.Log($"{mod.Name}: detected {mod.Directory}");
+                mod.Logger.Log("DynModLib: detected {mod.Directory}");
+
+                Compile();
+                Load();
+                Main.logger.Log($"{mod.Name}: initialized mod");
+                mod.Logger.Log($"DynModLib: initialized mod {mod.Name}");
+            }
+            catch (Exception e)
+            {
+                Main.logger.Log($"{mod.Name}: could not compile assembly");
+                mod.Logger.Log(e.Message, e.InnerException ?? e);
+                mod.ShutdownLogging();
+            }
+        }
+
+        private void Compile()
+        {
+            var sourceFiles = Directory.GetFiles(mod.SourcePath, "*.cs", SearchOption.AllDirectories);
+            CompileAssembly(mod.AssemblyPath, references, sourceFiles.ToList());
+        }
+
+        private void Load()
+        {
+            Assembly assembly;
+            try
+            {
+                assembly = Assembly.LoadFrom(mod.AssemblyPath);
+            }
+            catch (Exception e)
+            {
+                throw new Exception($"DynModLib: error loading assembly {mod.AssemblyPath}", e);
             }
 
             // TODO: remove loading once integrated into ModTek
@@ -79,40 +124,35 @@ namespace DynModLib
             var type = assembly.GetType(controlClass);
             if (type == null)
             {
-                logger.LogError("Can't find class \"" + controlClass + "\"");
-                return;
+                throw new Exception($"DynModLib: Can't find class \"{controlClass}\"");
             }
-            var method = type.GetMethod("OnInit", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Standard, new[]{typeof(string)}, null);
+            var method = type.GetMethod("Start", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Standard, new[] { typeof(string), typeof(string) }, null);
             if (method == null)
             {
-                logger.LogError("Can't find static method \"OnInit(string modDirectory)\" on class \"" + controlClass + "\"");
-                return;
+
+                throw new Exception($"DynModLib: Can't find static method \"Start(string modDirectory, string json)\" on class \"{controlClass}\"");
             }
             try
             {
-                method.Invoke(method, new object[] {mod});
+                method.Invoke(method, new object[] { mod.Directory, "{}" });
             }
             catch (Exception e)
             {
-                logger.LogError("error initializing mod " + mod.Name, e);
+                throw new Exception($"DynModLib: error initializing mod {mod.Name}", e);
             }
-
-            logger.Log("initialized mod " + mod.Name);
         }
 
-        private static Assembly CompileAssembly(string outPath, List<string> refPaths, List<string> srcPaths)
+        private void CompileAssembly(string outPath, List<string> refPaths, List<string> srcPaths)
         {
+            if (HasCachedAssembly(outPath, srcPaths))
+            {
+                Main.logger.Log($"{mod.Name}: found up-to-date assembly {outPath}");
+                mod.Logger.Log($"DynModLib: found up-to-date assembly {outPath}");
+                return;
+            }
+
             try
             {
-                {
-                    var cachedAssembly = GetCachedAssembly(outPath, srcPaths);
-                    if (cachedAssembly != null)
-                    {
-                        logger.Log("found cached assembly " + outPath);
-                        return cachedAssembly;
-                    }
-                }
-
                 var arguments = new List<string>();
                 arguments.Add("/target:library");
                 arguments.Add("/nostdlib+");
@@ -132,31 +172,28 @@ namespace DynModLib
                 writer.Flush();
                 if (result)
                 {
-                    logger.Log("compiled assembly " + outPath);
-                    return Assembly.LoadFrom(outPath);
+                    Main.logger.Log($"{mod.Name}: compiled assembly {outPath}");
+                    mod.Logger.Log($"DynModLib: compiled assembly {outPath}");
                 }
                 else
                 {
                     memory.Position = 0;
                     var reader = new StreamReader(memory);
-                    logger.LogError("csc could not compile assembly " + outPath);
-                    logger.LogError("csc output: " + reader.ReadToEnd());
-                    return null;
+                    var output = reader.ReadToEnd();
+                    throw new Exception($"DynModLib: Mono.CSharp could not compile assembly {outPath}, output {output}");
                 }
             }
             catch (Exception e)
             {
-                logger.LogError("could not start csc process", e);
+                throw new Exception("DynModLib: Could not call Mono.CSharp compiler", e);
             }
-
-            return null;
         }
 
-        private static Assembly GetCachedAssembly(string outPath, List<string> srcPaths)
+        private static bool HasCachedAssembly(string outPath, List<string> srcPaths)
         {
             if (!File.Exists(outPath))
             {
-                return null;
+                return false;
             }
 
             var assemblyDateTime = File.GetLastWriteTime(outPath);
@@ -165,11 +202,11 @@ namespace DynModLib
                 var sourceDateTime = File.GetLastWriteTime(sourceFile);
                 if (sourceDateTime.Subtract(assemblyDateTime).Ticks > 0)
                 {
-                    return null;
+                    return false;
                 }
             }
 
-            return Assembly.LoadFrom(outPath);
+            return true;
         }
     }
 
@@ -185,7 +222,8 @@ namespace DynModLib
         public string Directory { get; }
 
         public string AssemblyPath => Path.Combine(Directory, Name + ".dll");
-        private string SettingsPath => Path.Combine(Directory, "Settings.json");
+        public string SourcePath => Path.Combine(Directory, "source");
+        public string SettingsPath => Path.Combine(Directory, "Settings.json");
 
         public ILog Logger => HBS.Logging.Logger.GetLogger(Name);
         private FileLogAppender logAppender;
@@ -211,29 +249,6 @@ namespace DynModLib
                 level = LogLevel.Debug;
             }
             HBS.Logging.Logger.SetLoggerLevel(Name, level);
-
-            var logFile = settings.logFile;
-            if (!string.IsNullOrEmpty(logFile))
-            {
-                var logFilePath = Path.Combine(Directory, logFile);
-                try
-                {
-                    if (logAppender != null)
-                    {
-                        HBS.Logging.Logger.ClearAppender(Name);
-                        logAppender.Flush();
-                        logAppender.Close();
-                        logAppender = null;
-                    }
-                    logAppender = new FileLogAppender(logFilePath, FileLogAppender.WriteMode.INSTANT);
-
-                    HBS.Logging.Logger.AddAppender(Name, logAppender);
-                }
-                catch (Exception e)
-                {
-                    Logger.Log("can't create log file", e);
-                }
-            }
         }
 
         public void SaveSettings<T>(T settings) where T : ModSettings
@@ -244,12 +259,60 @@ namespace DynModLib
                 writer.Write(json);
             }
         }
+
+        internal void SetupLogging()
+        {
+            var logFilePath = Path.Combine(Directory, "log.txt");
+            try
+            {
+                ShutdownLogging();
+                AddLogFileForLogger(Name, logFilePath);
+            }
+            catch (Exception e)
+            {
+                Logger.Log("DynModLib: can't create log file", e);
+            }
+        }
+
+        internal void ShutdownLogging()
+        {
+            if (logAppender == null)
+            {
+                return;
+            }
+            HBS.Logging.Logger.ClearAppender(Name);
+            logAppender.Flush();
+            logAppender.Close();
+            logAppender = null;
+        }
+
+        private void AddLogFileForLogger(string name, string logFilePath)
+        {
+            logAppender = new FileLogAppender(logFilePath, FileLogAppender.WriteMode.INSTANT);
+
+            HBS.Logging.Logger.AddAppender(name, logAppender);
+        }
+
+        public override string ToString()
+        {
+            return $"{Name} ({Directory})";
+        }
     }
 
     public class ModSettings
     {
-        // after loading settings the log level will revert to Log from the initial Debug
         public string logLevel = "Log";
-        public string logFile = "log.txt";
+    }
+
+    public class Adapter<T>
+    {
+        public readonly T instance;
+        public readonly Traverse traverse;
+
+        protected Adapter(T instance)
+        {
+            this.instance = instance;
+            traverse = Traverse.Create(instance);
+        }
     }
 }
