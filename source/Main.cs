@@ -32,6 +32,8 @@ namespace DynModLib
 
                 Directory.GetDirectories(ModsDirectory)
                     .Where(d => File.Exists(Path.Combine(d, Path.Combine("source", "Control.cs"))))
+                    .Select(d => new Mod(d))
+                    .Do(m => logger.Log($"detected {m}"))
                     .Do(compiler.CompileAndLoad);
 
                 Logger.ClearAppender(ModName);
@@ -78,24 +80,19 @@ namespace DynModLib
 
         private Mod mod;
 
-        internal void CompileAndLoad(string modDirectory)
+        internal void CompileAndLoad(Mod mod)
         {
-            mod = new Mod(modDirectory);
+            this.mod = mod;
             mod.SetupLogging();
 
             try
             {
-                Main.logger.Log($"{mod.Name}: detected {mod.Directory}");
-                mod.Logger.Log("DynModLib: detected {mod.Directory}");
-
                 Compile();
-                Load();
-                Main.logger.Log($"{mod.Name}: initialized mod");
-                mod.Logger.Log($"DynModLib: initialized mod {mod.Name}");
+                Main.logger.Log($"{mod.Name}: prepared assembly");
             }
             catch (Exception e)
             {
-                Main.logger.Log($"{mod.Name}: could not compile assembly");
+                Main.logger.Log($"{mod.Name}: error preparing assembly");
                 mod.Logger.Log(e.Message, e.InnerException ?? e);
                 mod.ShutdownLogging();
             }
@@ -107,46 +104,10 @@ namespace DynModLib
             CompileAssembly(mod.AssemblyPath, references, sourceFiles.ToList());
         }
 
-        private void Load()
-        {
-            Assembly assembly;
-            try
-            {
-                assembly = Assembly.LoadFrom(mod.AssemblyPath);
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"DynModLib: error loading assembly {mod.AssemblyPath}", e);
-            }
-
-            // TODO: remove loading once integrated into ModTek
-            var controlClass = mod.Name + ".Control";
-            var type = assembly.GetType(controlClass);
-            if (type == null)
-            {
-                throw new Exception($"DynModLib: Can't find class \"{controlClass}\"");
-            }
-            var method = type.GetMethod("Start", BindingFlags.Public | BindingFlags.Static, null, CallingConventions.Standard, new[] { typeof(string), typeof(string) }, null);
-            if (method == null)
-            {
-
-                throw new Exception($"DynModLib: Can't find static method \"Start(string modDirectory, string json)\" on class \"{controlClass}\"");
-            }
-            try
-            {
-                method.Invoke(method, new object[] { mod.Directory, "{}" });
-            }
-            catch (Exception e)
-            {
-                throw new Exception($"DynModLib: error initializing mod {mod.Name}", e);
-            }
-        }
-
         private void CompileAssembly(string outPath, List<string> refPaths, List<string> srcPaths)
         {
             if (HasCachedAssembly(outPath, srcPaths))
             {
-                Main.logger.Log($"{mod.Name}: found up-to-date assembly {outPath}");
                 mod.Logger.Log($"DynModLib: found up-to-date assembly {outPath}");
                 return;
             }
@@ -172,7 +133,6 @@ namespace DynModLib
                 writer.Flush();
                 if (result)
                 {
-                    Main.logger.Log($"{mod.Name}: compiled assembly {outPath}");
                     mod.Logger.Log($"DynModLib: compiled assembly {outPath}");
                 }
                 else
