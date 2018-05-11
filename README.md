@@ -29,8 +29,9 @@ Before doing modding, make yourself familiar with [dnSpy](https://github.com/0xd
 See an example project, e.g. [StatsFixMod](https://github.com/CptMoore/StatsFixMod).
 
 Checklist of things to do:
-* Make a copy of the folder in \BATTLETECH\Mods\ .
-* Rename the folder to your mods name.
+* Download the example project
+* Make sure not to overwrite any existing mod, extract it to another folder under \BATTLETECH\mods\
+* The folder should be named after your mod and contain the source directory, \BATTLETECH\mods\MyMod\source
 * Remove all *Patch.cs files from the example mod, you probably want to write your own.
 * Open Control.cs and change the namespace used to your mods name.
 * Open mod.json and change the DLL name to your mods name.
