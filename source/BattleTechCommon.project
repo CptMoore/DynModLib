@@ -1,49 +1,48 @@
-<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003"> 
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+ <Import Project="BattleTechCommon.project.user" Condition="Exists('BattleTechCommon.project.user')" />
  <PropertyGroup>
-    <BattleTechDir>D:\Steam\steamapps\common\BATTLETECH</BattleTechDir>
+    <BattleTechDir>$(BattleTechGame)</BattleTechDir>
     <BattleTechModsDir>$(BattleTechDir)\Mods</BattleTechModsDir>
     <BattleTechManagedDir>$(BattleTechDir)\BattleTech_Data\Managed</BattleTechManagedDir>
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>$(BattleTechManagedDir)\0Harmony.dll</HintPath>
-      <Private>True</Private>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
       <HintPath>$(BattleTechManagedDir)\Assembly-CSharp.dll</HintPath>
-      <Private>True</Private>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Mono.CSharp">
       <HintPath>..\Mono.CSharp.dll</HintPath>
+      <Private>True</Private>
     </Reference>
      <Reference Include="UnityEngine">
       <HintPath>$(BattleTechManagedDir)\UnityEngine.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.Networking">
       <HintPath>$(BattleTechManagedDir)\UnityEngine.Networking.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
       <HintPath>$(BattleTechManagedDir)\UnityEngine.UI.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
- <ItemGroup>  
-      <ModDll Include="$(TargetDir)$(TargetName).dll;$(ProjectDir)..\Mono.CSharp.dll"/>  
-      <ModFiles Include="$(ProjectDir)..\mod.json"/>  
+  <ItemGroup>
+      <ModFiles Include="$(TargetDir)$(TargetName).dll;$(TargetDir)Mono.CSharp.dll;$(ProjectDir)..\mod.json"/>  
   </ItemGroup>
   <Target Name="CopyFiles" AfterTargets="Build">
       <Copy  
         SourceFiles="@(ModFiles)"  
         DestinationFolder="$(BattleTechModsDir)\$(TargetName)\"
-        Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' "
-      />
-      <Copy  
-        SourceFiles="@(ModDll)"  
-        DestinationFolder="$(BattleTechModsDir)\"
-        Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' "
       />
       <Zip 
           InputFileNames="@(ModFiles)"
           OutputFileName="$(TargetDir)\$(TargetName).zip"
+		  OverwriteExistingFile="true"
           Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' "
       />
   </Target>
