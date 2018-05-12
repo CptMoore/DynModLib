@@ -1,7 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-	<Import Project="common.tasks"/>
-  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+	<Import Project="BattleTechCommon.project"/>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
@@ -12,9 +11,6 @@
     <AssemblyName>DynModLib</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <BattleTechDir>D:\Steam\steamapps\common\BATTLETECH</BattleTechDir>
-    <BattleTechModsDir>$(BattleTechDir)\Mods</BattleTechModsDir>
-    <BattleTechManagedDir>$(BattleTechDir)\BattleTech_Data\Managed</BattleTechManagedDir>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -38,32 +34,12 @@
     <RunPostBuildEvent>OnBuildSuccess</RunPostBuildEvent>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="0Harmony">
-      <HintPath>$(BattleTechManagedDir)\0Harmony.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>$(BattleTechManagedDir)\Assembly-CSharp.dll</HintPath>
-      <Private>True</Private>
-    </Reference>
-    <Reference Include="Mono.CSharp">
-      <HintPath>..\Mono.CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-     <Reference Include="UnityEngine">
-      <HintPath>$(BattleTechManagedDir)\UnityEngine.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.Networking">
-      <HintPath>$(BattleTechManagedDir)\UnityEngine.Networking.dll</HintPath>
-    </Reference>
-    <Reference Include="UnityEngine.UI">
-      <HintPath>$(BattleTechManagedDir)\UnityEngine.UI.dll</HintPath>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Main.cs" />
@@ -72,23 +48,5 @@
   <ItemGroup>
     <None Include="..\README.md" />
   </ItemGroup>
-  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <ItemGroup>  
-      <ModFiles Include="$(TargetDir)$(TargetName).dll;$(ProjectDir)..\Mono.CSharp.dll;$(ProjectDir)..\mod.json"/>  
-  </ItemGroup>
-  <Target Name="CreateModDirectory" BeforeTargets="Build">  
-      <MakeDir Directories="$(BattleTechModsDir)\$(TargetName)\"/>  
-  </Target>  
-  <Target Name="CopyFiles" AfterTargets="Build">
-      <Copy  
-        SourceFiles="@(ModFiles)"  
-        DestinationFolder="$(BattleTechModsDir)\$(TargetName)\"
-        Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' "
-      />
-      <Zip 
-          InputFileNames="@(ModFiles)"
-          OutputFileName="$(TargetDir)\$(TargetName).zip"
-          Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' "
-        />
-  </Target>  
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
