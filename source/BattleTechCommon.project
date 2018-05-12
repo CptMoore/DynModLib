@@ -27,7 +27,7 @@
     </Reference>
   </ItemGroup>
  <ItemGroup>  
-      <ModDll Include="$(TargetDir)$(TargetName).dll;"/>  
+      <ModDll Include="$(TargetDir)$(TargetName).dll;$(ProjectDir)..\Mono.CSharp.dll"/>  
       <ModFiles Include="$(ProjectDir)..\mod.json"/>  
   </ItemGroup>
   <Target Name="CopyFiles" AfterTargets="Build">
