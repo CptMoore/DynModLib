@@ -26,10 +26,8 @@ namespace DynModLib
                 var compiler = new ModCompiler(compilerAssembly, references);
 
                 Directory.GetDirectories(lib.ModsPath)
-                    .Where(d => File.Exists(Path.Combine(d, Path.Combine("source", "Control.cs"))))
-                    .Select(d => new Mod(d))
-                    .Do(m => lib.Logger.Log($"detected {m}"))
-                    .Do(compiler.CompileAndLoad);
+                    .Where(d => File.Exists(Path.Combine(d, "mod.json")))
+                    .Do(compiler.CheckAndCompile);
             }
             catch (Exception e)
             {
@@ -77,13 +75,24 @@ namespace DynModLib
 
         private Mod mod;
 
-        internal void CompileAndLoad(Mod mod)
+        internal void CheckAndCompile(string modDirectory)
         {
-            this.mod = mod;
-            mod.SetupLogging();
-
             try
             {
+                mod = new Mod(modDirectory);
+                if (!mod.DependsOnDynModLib)
+                {
+                    return;
+                }
+
+                Main.lib.Logger.Log($"detected {mod}");
+                mod.SetupLogging();
+
+                if (mod.AssemblyPath == null)
+                {
+                    throw new Exception("Assembly DLL is not set");
+                }
+
                 Compile();
                 Main.lib.Logger.Log($"{mod.Name}: prepared assembly");
             }
@@ -178,10 +187,10 @@ namespace DynModLib
         public string Name { get; }
         public string Directory { get; }
 
-        public string AssemblyPath => Path.Combine(Directory, Name + ".dll");
         public string SourcePath => Path.Combine(Directory, "source");
         public string SettingsPath => Path.Combine(Directory, "Settings.json");
         public string ModsPath => Path.GetDirectoryName(Directory);
+        public string InfoPath => Path.Combine(Directory, "mod.json");
 
         public ILog Logger => HBS.Logging.Logger.GetLogger(Name);
         private FileLogAppender logAppender;
@@ -192,13 +201,12 @@ namespace DynModLib
             {
                 return;
             }
-
-            string json;
+            
             using (var reader = new StreamReader(SettingsPath))
             {
-                json = reader.ReadToEnd();
+                var json = reader.ReadToEnd();
+                JSONSerializationUtility.FromJSON(settings, json);
             }
-            JSONSerializationUtility.FromJSON(settings, json);
 
             var logLevelString = settings.logLevel;
             DebugBridge.StringToLogLevel(logLevelString, out var level);
@@ -211,10 +219,33 @@ namespace DynModLib
 
         public void SaveSettings<T>(T settings) where T : ModSettings
         {
-            var json = JSONSerializationUtility.ToJSON(settings);
             using (var writer = new StreamWriter(SettingsPath))
             {
+                var json = JSONSerializationUtility.ToJSON(settings);
                 writer.Write(json);
+            }
+        }
+        
+        internal bool DependsOnDynModLib => ModTekInfo.DependsOn.Contains(Main.lib.Name);
+        internal string AssemblyPath => string.IsNullOrEmpty(ModTekInfo.DLL) ? null : Path.Combine(Directory, ModTekInfo.DLL);
+
+        private ModTekInfo _modTekInfo;
+        internal ModTekInfo ModTekInfo
+        {
+            get
+            {
+                if (_modTekInfo == null)
+                {
+                    using (var reader = new StreamReader(InfoPath))
+                    {
+                        var info = new ModTekInfo();
+                        var json = reader.ReadToEnd();
+                        JSONSerializationUtility.FromJSON(info, json);
+                        _modTekInfo = info;
+                    }
+                }
+
+                return _modTekInfo;
             }
         }
 
@@ -241,7 +272,6 @@ namespace DynModLib
 
             try
             {
-
                 HBS.Logging.Logger.ClearAppender(Name);
                 logAppender.Flush();
                 logAppender.Close();
@@ -269,6 +299,12 @@ namespace DynModLib
     public class ModSettings
     {
         public string logLevel = "Log";
+    }
+
+    internal class ModTekInfo
+    {
+        public string[] DependsOn = { };
+        public string DLL = null;
     }
 
     public class Adapter<T>

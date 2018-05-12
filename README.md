@@ -9,7 +9,7 @@ BattleTech mod (using BTML) that provides C# scripting abilities for ModTek mods
 
 ### Limitations and Known Bugs
 
-- Has to have a file called mods\mymod\source\Control.cs in order to start compilation of the whole source\ folder
+- All files under mods\mymod\source\ are compiled into the assembly DLL specified in the mods mod.json file. No selective compilation possible.
 - C# 5.0 language features only, so nothing you see [here](https://github.com/dotnet/roslyn/wiki/New-Language-Features-in-C%23-6) can be used
 - Mono.CSharp version used for compiling is buggy, it can compile code that crashes e.g. using SelectMany and string[][]. It's usually good enough though.
   It can't be helped, modern compiler versions don't have those bugs but require 20MB of compiler libraries/exes instead of only 1MB.
