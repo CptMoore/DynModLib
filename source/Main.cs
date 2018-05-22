@@ -25,9 +25,11 @@ namespace DynModLib
                 var references = CollectReferences();
                 var compiler = new ModCompiler(compilerAssembly, references);
 
-                Directory.GetDirectories(lib.ModsPath)
-                    .Where(d => File.Exists(Path.Combine(d, "mod.json")))
-                    .Do(compiler.CheckAndCompile);
+                foreach (var d in Directory.GetDirectories(lib.ModsPath)
+                    .Where(d => File.Exists(Path.Combine(d, "mod.json"))))
+                {
+                    compiler.CheckAndCompile(d);
+                }
             }
             catch (Exception e)
             {
