@@ -17,6 +17,8 @@ namespace DynModLib
 
         public static void Start(string modDirectory, string json)
         {
+            var sw = new StopWatch();
+            sw.Start();
             lib = new Mod(modDirectory);
             lib.SetupLogging();
             try
@@ -37,7 +39,9 @@ namespace DynModLib
             }
             finally
             {
-                lib?.ShutdownLogging();
+                sw.Stop();
+                lib.Logger.Log($"Checked and compiled mods in {sw.Elapsed.TotalMilliseconds}ms");
+                lib.ShutdownLogging();
             }
         }
 
@@ -58,10 +62,6 @@ namespace DynModLib
 
             return Directory.GetFiles(assemblyLocation, "*.dll").ToList();
         }
-
-        public static void Reset()
-        {
-        }
     }
 
     internal class ModCompiler
@@ -79,6 +79,8 @@ namespace DynModLib
 
         internal void CheckAndCompile(string modDirectory)
         {
+            var sw = new StopWatch();
+            sw.Start();
             try
             {
                 mod = new Mod(modDirectory);
@@ -103,6 +105,15 @@ namespace DynModLib
                 Main.lib.Logger.Log($"{mod.Name}: error preparing assembly");
                 mod.Logger.Log(e.Message, e.InnerException ?? e);
                 mod.ShutdownLogging();
+            }
+            finally
+            {
+                sw.Stop();
+                if (mod != null)
+                {
+                    mod.Logger.Log($"Checked and compiled in {sw.Elapsed.TotalMilliseconds}ms");
+                    Main.lib.Logger.Log($"{mod.Name}: Checked and compiled in {sw.Elapsed.TotalMilliseconds}ms");
+                }
             }
         }
 
@@ -318,6 +329,23 @@ namespace DynModLib
         {
             this.instance = instance;
             traverse = Traverse.Create(instance);
+        }
+    }
+
+    internal class StopWatch
+    {
+        public TimeSpan Elapsed { get; private set; }
+        public DateTime StartDateTime { get; private set; }
+        public DateTime StopDateTime { get; private set; }
+        public void Start()
+        {
+            StartDateTime = DateTime.Now;
+        }
+
+        public void Stop()
+        {
+            StopDateTime = DateTime.Now;
+            Elapsed = StopDateTime.Subtract(StartDateTime);
         }
     }
 }
