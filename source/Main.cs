@@ -62,6 +62,10 @@ namespace DynModLib
 
             return Directory.GetFiles(assemblyLocation, "*.dll").ToList();
         }
+
+        public static void Reset()
+        {
+        }
     }
 
     internal class ModCompiler
@@ -79,12 +83,12 @@ namespace DynModLib
 
         internal void CheckAndCompile(string modDirectory)
         {
-            var sw = new StopWatch();
-            sw.Start();
             try
             {
+                var sw = new StopWatch();
+                sw.Start();
                 mod = new Mod(modDirectory);
-                if (!mod.DependsOnDynModLib || !File.Exists(mod.SourcePath))
+                if (!mod.DependsOnDynModLib || !Directory.Exists(mod.SourcePath))
                 {
                     return;
                 }
@@ -98,7 +102,9 @@ namespace DynModLib
                 }
 
                 Compile();
-                Main.lib.Logger.Log($"{mod.Name}: prepared assembly");
+                
+                sw.Stop();
+                Main.lib.Logger.Log($"{mod.Name}: prepared assembly in {sw.Elapsed.TotalMilliseconds}ms");
             }
             catch (Exception e)
             {
@@ -108,12 +114,6 @@ namespace DynModLib
             }
             finally
             {
-                sw.Stop();
-                if (mod != null)
-                {
-                    mod.Logger.Log($"Checked and compiled in {sw.Elapsed.TotalMilliseconds}ms");
-                    Main.lib.Logger.Log($"{mod.Name}: Checked and compiled in {sw.Elapsed.TotalMilliseconds}ms");
-                }
             }
         }
 
