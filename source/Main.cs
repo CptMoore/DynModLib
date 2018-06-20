@@ -84,7 +84,7 @@ namespace DynModLib
             try
             {
                 mod = new Mod(modDirectory);
-                if (!mod.DependsOnDynModLib)
+                if (!mod.DependsOnDynModLib || !File.Exists(mod.SourcePath))
                 {
                     return;
                 }
