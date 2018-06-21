@@ -2,6 +2,7 @@
 	"Name": "DynModLib",
 	"Author": "CptMoore",
 	"Website": "https://github.com/CptMoore/DynModLib",
+	"Version": "1.0",
 
 	"DLL": "DynModLib.dll",
 	"DLLEntryPoint": "DynModLib.Main.Start"
