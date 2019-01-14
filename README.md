@@ -3,7 +3,7 @@ BattleTech mod (using BTML) that provides C# scripting abilities for ModTek mods
 
 ## Features
 
-- can compile whole mods when loading BattleTech, an example can be seen with [StatsFixMod](https://github.com/CptMoore/StatsFixMod)
+- can compile whole mods when loading BattleTech, an example can be seen with [SpeedMod](https://github.com/CptMoore/SpeedMod)
 - allows mod users to change code without installing Visual Studio or equivalent software
 - allows modders to quickly change code without having to start Visual Studio
 
@@ -19,21 +19,15 @@ BattleTech mod (using BTML) that provides C# scripting abilities for ModTek mods
 - provide modders the ability to selectively compile and use C# scripts
 
 ## Requirements and Installation
-** Warning: Uses the experimental BTML and ModTek **
 
-either
-* install BattleTechModTools using [BattleTechModInstaller](https://github.com/CptMoore/BattleTechModTools/releases)
-
-or
-* install [BattleTechModLoader](https://github.com/Mpstark/BattleTechModLoader/releases) using [instructions here](https://github.com/Mpstark/BattleTechModLoader)
-* install [ModTek](https://github.com/Mpstark/ModTek/releases) using [instructions here](https://github.com/Mpstark/ModTek)
+* install [ModTek](https://github.com/BattletechModders/ModTek/releases) using [instructions here](https://github.com/BattletechModders/ModTek)
 * install DynModLib by putting it into the \BATTLETECH\Mods\ folder
 
 ## How to use
 
 Before doing modding, make yourself familiar with [dnSpy](https://github.com/0xd4d/dnSpy/releases). You need this to know what to mod.
 
-See an example project, e.g. [StatsFixMod](https://github.com/CptMoore/StatsFixMod).
+See an example project, e.g. [SpeedMod](https://github.com/CptMoore/SpeedMod).
 
 Checklist of things to do:
 * Download the example project
