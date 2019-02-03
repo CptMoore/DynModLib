@@ -49,18 +49,21 @@ namespace DynModLib
         {
             var references = GetManagedAssemblyPaths();
             references.Add(Assembly.GetExecutingAssembly().Location);
+            references.Add(GetAssemblyByName("0Harmony").Location);
             return references;
         }
 
         private static List<string> GetManagedAssemblyPaths()
         {
-            var assemblyLocation = Assembly.GetExecutingAssembly().GetReferencedAssemblies()
-                .Where(assemblyName => assemblyName.Name == "mscorlib")
-                .Select(assemblyName => Assembly.ReflectionOnlyLoad(assemblyName.FullName).Location)
-                .Select(Path.GetDirectoryName)
-                .Single();
+            var location = GetAssemblyByName("Assembly-CSharp").Location;
+            var directory = Path.GetDirectoryName(location);
+            return Directory.GetFiles(directory, "*.dll").ToList();
+        }
 
-            return Directory.GetFiles(assemblyLocation, "*.dll").ToList();
+        private static Assembly GetAssemblyByName(string name)
+        {
+            return AppDomain.CurrentDomain.GetAssemblies()
+                .Single(assembly => assembly.GetName().Name == name);
         }
 
         public static void Reset()
