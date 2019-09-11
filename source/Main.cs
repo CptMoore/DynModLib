@@ -24,6 +24,15 @@ namespace DynModLib
             try
             {
                 var compilerAssembly = Assembly.LoadFrom(Path.Combine(lib.Directory, "Mono.CSharp.dll"));
+
+                {
+                    // fix for misbehaving of AssemblyDefinition CheckReferencesPublicToken
+                    var harmony = HarmonyInstance.Create("DynModLib.CSharp");
+                    var mOriginal = compilerAssembly.GetType("Mono.CSharp.AssemblyDefinition").GetMethod("CheckReferencesPublicToken", BindingFlags.Instance | BindingFlags.NonPublic);
+                    var mPrefix = typeof(Main).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.Public);
+                    harmony.Patch(mOriginal, new HarmonyMethod(mPrefix));
+                }
+
                 var references = CollectReferences();
                 var compiler = new ModCompiler(compilerAssembly, references);
 
@@ -43,6 +52,11 @@ namespace DynModLib
                 lib.Logger.Log($"Checked and compiled mods in {sw.Elapsed.TotalMilliseconds}ms");
                 lib.ShutdownLogging();
             }
+        }
+
+        public static bool Prefix()
+        {
+            return false;
         }
 
         private static List<string> CollectReferences()
@@ -75,11 +89,23 @@ namespace DynModLib
     {
         private readonly Assembly compilerAssembly;
         private readonly List<string> references;
+        private readonly DateTime lastestAssemblyWriteTime;
 
         internal ModCompiler(Assembly compilerAssembly, List<string> references)
         {
             this.compilerAssembly = compilerAssembly;
             this.references = references;
+
+            var latestWriteTime = DateTime.MinValue;
+            foreach (var reference in references)
+            {
+                var writeTime = File.GetLastWriteTime(reference);
+                if (writeTime.CompareTo(latestWriteTime) > 0)
+                {
+                    latestWriteTime = writeTime;
+                }
+            }
+            lastestAssemblyWriteTime = latestWriteTime;
         }
 
         private Mod mod;
@@ -171,7 +197,7 @@ namespace DynModLib
             }
         }
 
-        private static bool HasCachedAssembly(string outPath, List<string> srcPaths)
+        private bool HasCachedAssembly(string outPath, List<string> srcPaths)
         {
             if (!File.Exists(outPath))
             {
@@ -179,10 +205,16 @@ namespace DynModLib
             }
 
             var assemblyDateTime = File.GetLastWriteTime(outPath);
+
+            if (lastestAssemblyWriteTime.CompareTo(assemblyDateTime) > 0)
+            {
+                return false;
+            }
+
             foreach (var sourceFile in srcPaths)
             {
                 var sourceDateTime = File.GetLastWriteTime(sourceFile);
-                if (sourceDateTime.Subtract(assemblyDateTime).Ticks > 0)
+                if (sourceDateTime.CompareTo(assemblyDateTime) > 0)
                 {
                     return false;
                 }
