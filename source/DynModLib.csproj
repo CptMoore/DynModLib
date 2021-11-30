@@ -17,8 +17,6 @@
     <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(SolutionDir)/.." />
   </Target>
   <ItemGroup>
-    <Reference Include="System" />
-    <Reference Include="System.Core" />
     <Reference Include="0Harmony">
       <Private>False</Private>
     </Reference>

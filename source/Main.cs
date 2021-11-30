@@ -8,12 +8,14 @@ using System.Collections.Generic;
 using System.Text;
 using BattleTech;
 using HBS.Logging;
+using Mono.CSharp;
 
 namespace DynModLib
 {
     public static class Main
     {
         internal static Mod lib;
+        internal static Assembly compilerAssembly;
 
         public static void Start(string modDirectory, string json)
         {
@@ -23,17 +25,16 @@ namespace DynModLib
             lib.SetupLogging();
             try
             {
-                var compilerAssembly = Assembly.LoadFrom(Path.Combine(lib.Directory, "Mono.CSharp.dll"));
+                compilerAssembly = Assembly.LoadFrom(Path.Combine(lib.Directory, "Mono.CSharp.dll"));
 
-                {
-                    // fix for misbehaving of AssemblyDefinition CheckReferencesPublicToken
-                    var harmony = HarmonyInstance.Create("DynModLib.CSharp");
-                    var mOriginal = compilerAssembly.GetType("Mono.CSharp.AssemblyDefinition").GetMethod("CheckReferencesPublicToken", BindingFlags.Instance | BindingFlags.NonPublic);
-                    var mPrefix = typeof(Main).GetMethod(nameof(Prefix), BindingFlags.Static | BindingFlags.Public);
-                    harmony.Patch(mOriginal, new HarmonyMethod(mPrefix));
-                }
+                HarmonyInstance.Create("DynModLib.CSharp").PatchAll();
 
                 var references = CollectReferences();
+                lib.Logger.LogDebug($"Found references:");
+                foreach (var reference in references)
+                {
+                    lib.Logger.LogDebug($"\t{reference}");
+                }
                 var compiler = new ModCompiler(compilerAssembly, references);
 
                 foreach (var d in Directory.GetDirectories(lib.ModsPath)
@@ -54,16 +55,12 @@ namespace DynModLib
             }
         }
 
-        public static bool Prefix()
-        {
-            return false;
-        }
-
         private static List<string> CollectReferences()
         {
             var references = GetManagedAssemblyPaths();
             references.Add(Assembly.GetExecutingAssembly().Location);
-            references.Add(GetAssemblyByName("0Harmony").Location);
+            references.RemoveAll(x=> x.Contains("System.Runtime."));
+            references.RemoveAll(x=> x.Contains("System.ValueTuple."));
             return references;
         }
 
@@ -85,15 +82,51 @@ namespace DynModLib
         }
     }
 
+    [HarmonyPatch(typeof(MetadataImporter), nameof(MetadataImporter.GetAssemblyDefinition))]
+    internal static class MetadataImporter_GetAssemblyDefinition_Patch
+    {
+        private static Assembly lastLoadingAssembly;
+        public static void Prefix(Assembly assembly)
+        {
+            lastLoadingAssembly = assembly;
+        }
+
+        public static void Postfix()
+        {
+            lastLoadingAssembly = null;
+        }
+
+        internal static void LogIfError()
+        {
+            if (lastLoadingAssembly != null)
+            {
+                Main.lib.Logger.LogError($"Couldn't load {lastLoadingAssembly} from {lastLoadingAssembly.Location}!");
+            }
+        }
+    }
+
+    [HarmonyPatch]
+    internal static class AssemblyDefinition_CheckReferencesPublicToken_Patch
+    {
+        public static MethodInfo TargetMethod()
+        {
+            return Main.compilerAssembly.GetType("Mono.CSharp.AssemblyDefinition")
+                .GetMethod("CheckReferencesPublicToken", BindingFlags.Instance | BindingFlags.NonPublic);
+        }
+
+        public static bool Prefix()
+        {
+            return false;
+        }
+    }
+
     internal class ModCompiler
     {
-        private readonly Assembly compilerAssembly;
         private readonly List<string> references;
         private readonly DateTime lastestAssemblyWriteTime;
 
         internal ModCompiler(Assembly compilerAssembly, List<string> references)
         {
-            this.compilerAssembly = compilerAssembly;
             this.references = references;
 
             var latestWriteTime = DateTime.MinValue;
@@ -131,7 +164,7 @@ namespace DynModLib
                 }
 
                 Compile();
-                
+
                 sw.Stop();
                 Main.lib.Logger.Log($"{mod.Name}: prepared assembly in {sw.Elapsed.TotalMilliseconds}ms");
             }
@@ -162,19 +195,25 @@ namespace DynModLib
 
             try
             {
-                var arguments = new List<string>();
-                arguments.Add("/target:library");
-                arguments.Add("/nostdlib+");
-                arguments.Add("/noconfig");
-                arguments.Add("/debug-");
-                arguments.Add("/optimize+");
-                arguments.Add("/out:" + outPath);
+                var arguments = new List<string>
+                {
+                    "/target:library",
+                    "/nostdlib+",
+                    "/noconfig",
+                    "/debug-",
+                    "/optimize+",
+                    // "/platform:anycpu",
+                    "/langversion:latest",
+                    // "/unsafe+",
+                    // "/checked-",
+                    "/out:" + outPath
+                };
                 refPaths.ForEach(r => arguments.Add("/r:" + r));
                 srcPaths.ForEach(s => arguments.Add(s));
 
                 var memory = new MemoryStream();
                 var writer = new StreamWriter(memory, Encoding.UTF8);
-                var type = compilerAssembly.GetType("Mono.CSharp.CompilerCallableEntryPoint");
+                var type = Main.compilerAssembly.GetType("Mono.CSharp.CompilerCallableEntryPoint");
                 var method = type.GetMethod("InvokeCompiler");
                 // CompilerCallableEntryPoint.InvokeCompiler(arguments.ToArray(), writer)
                 var result = (bool)method.Invoke(method, new object[] { arguments.ToArray(), writer });
@@ -193,6 +232,7 @@ namespace DynModLib
             }
             catch (Exception e)
             {
+                MetadataImporter_GetAssemblyDefinition_Patch.LogIfError();
                 throw new Exception("DynModLib: Could not call Mono.CSharp compiler", e);
             }
         }
@@ -249,7 +289,7 @@ namespace DynModLib
             {
                 return;
             }
-            
+
             using (var reader = new StreamReader(SettingsPath))
             {
                 var json = reader.ReadToEnd();
@@ -273,7 +313,7 @@ namespace DynModLib
                 writer.Write(json);
             }
         }
-        
+
         internal bool DependsOnDynModLib => ModTekInfo.DependsOn.Contains(Main.lib.Name);
         internal string AssemblyPath => string.IsNullOrEmpty(ModTekInfo.DLL) ? null : Path.Combine(Directory, ModTekInfo.DLL);
 
