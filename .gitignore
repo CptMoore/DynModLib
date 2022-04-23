@@ -4,6 +4,7 @@
 log.txt
 DynModLib.dll
 DynModLib.zip
+modstate.json
 
 # User-specific files
 *.suo
